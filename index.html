@@ -1,0 +1,462 @@
+<!html>
+<html>
+<head>
+    <script src="js/pixi.js"></script>
+    <script src="js/pixi-extra-filters.min.js"></script>
+
+</head>
+<body>
+
+
+<script>
+    /**
+     * Created by Mei-work on 12/05/2017.
+     */
+// The application will create a renderer using WebGL, if possible,
+// with a fallback to a canvas render. It will also setup the ticker
+// and the root stage PIXI.Container.
+    var app = new PIXI.Application();
+
+
+    // The application will create a canvas element for you that you
+    // can then insert into the DOM.
+
+
+    PIXI.loader.add('spaceship', 'images/playerspaceship.png')
+            //    .add('beam' , 'images/beam.png')
+            .load(function (loader, resources) {
+                var splash = true;
+                var spaceship;
+                var mid;
+                var far;
+                var buttonPlay;
+                var exitButton;
+                var elements = [];
+                var turnspeed;
+                var parts = [];
+                var beams = [];
+                var playershippartsArray = [];
+
+                var farTexture = PIXI.Texture.fromImage("images/farback.gif");
+                var midTexture = PIXI.Texture.fromImage("images/midlayer.png");
+                var enemyspaceship = PIXI.Texture.fromImage("images/enemyspaceship.png");
+                var playbutton = PIXI.Sprite.fromImage("images/playbutton.png");
+                var exitbutton = PIXI.Sprite.fromImage("images/exitbutton.png");
+                var fullSceenCover = PIXI.Sprite.fromImage("images/splashscreen.bmp");
+                var logo = PIXI.Sprite.fromImage("images/logo.png");
+                var introBackDrop = PIXI.Sprite.fromImage("images/backdrop.jpg");
+                var endBackDrop = PIXI.Sprite.fromImage("images/gameoverbg.jpg");
+                var introspaceships = PIXI.Texture.fromImage("images/spaceShips_004.png");
+                var shipparts = PIXI.Texture.fromImage("images/spaceParts_001.png");
+                var playershipparts = PIXI.Texture.fromImage("images/playerspaceparts.png");
+                var beam = PIXI.Texture.fromImage("images/beam.png");
+                beam.vx = 20;
+
+                //containers
+                var mainMenuContainer = new PIXI.Container();
+                var gameContainer = new PIXI.Container();
+                var gameOverContainer = new PIXI.Container();
+
+                //sounds
+                var buttonclick = new Audio('sounds/buttonclick.ogg');
+                var firelaser = new Audio('sounds/laserfire.ogg');
+                var introMusic = new Audio('sounds/intro.mp3');
+                var explosion = new Audio('sounds/explosion.mp3');
+                var gameOverMusic = new Audio('sounds/gameovermusic.mp3');
+                introMusic.loop = gameOverMusic.loop = true;
+
+                //Appending main stage to body DOM
+
+                document.body.appendChild(app.view);
+
+                // This creates a texture from a image.
+                spaceship = new PIXI.Sprite(resources.spaceship.texture);
+                far = new PIXI.extras.TilingSprite(farTexture, 800, 600);
+                mid = new PIXI.extras.TilingSprite(midTexture, 800, 600);
+                app.stage.interactive = true;
+                render();
+
+
+                function update() {
+                    far.tilePosition.x -= 0.128;
+                    mid.tilePosition.x -= 0.64;
+
+                    //random movement of enemy ship with reverse
+                    for (var e in elements) {
+                        if (elements[e].dir == 1) {
+                            //moveShip(elements[e])
+                            elements[e].position.x += Math.random() * (app.renderer.width - app.renderer.width) + 1;
+                            elements[e].position.y += Math.random() * (app.renderer.height - app.renderer.height) + 1;
+                        } else if (elements[e].dir == -1) {
+                            //reverseShip(elements[e]);
+                            elements[e].position.x -= Math.random() * (app.renderer.width - app.renderer.width) + 1;
+                            elements[e].position.y -= Math.random() * (app.renderer.height - app.renderer.height) + 1;
+                        }
+                        //i'm improvising here so let's make dir=0 not moving
+                        if (elements[e].x > app.renderer.width && elements[e].dir == 1) {
+                            elements[e].dir = -1; //and here you reverse movement direction
+                        }
+                        if (elements[e].x < 0 && elements[e].dir == -1) {
+                            elements[e].dir = 1; //and here you reverse movement direction
+                        }
+                    }
+                    //Ship && Beam parts animation
+                    beams.length = 0;
+                    playershippartsArray.length = 10;
+                    for (var b = parts.length - 1; b >= 0; b--) {
+                        var part = parts[b];
+                        if (part.texture == beam) {
+                            beams.push(parts[b]);
+                            part.position.x += beam.vx;
+                        } else if (parts[b].texture == shipparts){
+//
+                            part.position.x += Math.cos(part.rotation) * 15;
+                            part.position.y += Math.sin(part.rotation) * 15;
+                        }
+
+                         else if (parts[b].texture == playershipparts){
+
+                                part.position.x += Math.cos(part.rotation) * 15;
+                            part.position.y += Math.sin(part.rotation) * 15;
+
+
+
+
+                        }
+                        if (part.x >= app.renderer.width + 10 ||
+                                part.y > app.renderer.height + 10 ||
+                                part.x < -10 ||
+                                part.y < -10) {
+                            explosion.play();
+                            part.parent.removeChild(part);
+                            parts.splice(b, 1);
+                        }
+                    }
+
+                    //If beams hits enemy ship
+                    for (var i = elements.length-1; i>=0;i--) {
+                        if (intersects(beams, elements[i]) ) {
+                            for (var b = 0; b < 10; b++) {
+                                explosion.play();
+                                explode(Math.random() * Math.PI * 2, elements[i].position, shipparts);
+                            }
+                            explosion.play();
+                            elements[i].parent.removeChild(elements[i]);
+                            elements.splice(i, 1);
+                        }
+                    }
+
+                    //that means if spaceship is still there (has a parent),
+                    // we check intersection and if its intersects then remove it
+                    if (spaceship.parent && intersects(elements, spaceship)) {
+                        for (var b = 0; b < 10; b++) {
+                            explode(Math.random() * Math.PI * 2, spaceship, playershipparts);
+                        }
+
+                        spaceship.parent.removeChild(spaceship);
+                        setTimeout(function(){
+                                gameOver();
+                    },2000);
+                        }
+                    }
+
+
+
+                function render() {
+                    //Splash screen
+
+                    var screenFadeContainer = new PIXI.Container();
+                    screenFadeContainer.scale.x = screenFadeContainer.scale.y = 1;
+                    app.stage.addChild(screenFadeContainer);
+                    screenFadeContainer.addChild(fullSceenCover);
+
+                    logo = new PIXI.Sprite(logo.texture);
+                    logo.x = app.renderer.width / 2;
+                    logo.y = app.renderer.height / 2;
+                    var blurFilter = new PIXI.filters.BlurFilter();
+
+                    fullSceenCover.filters = [blurFilter];
+                    introMusic.play();
+
+                    //TODO: maybe move to update() later
+                    var count = 0;
+                    function blurStuff() {
+                        count += 0.005;
+                        blurFilter.blur = 20 * (count);
+                        screenFadeContainer.fill +=1;
+                    }
+                    app.ticker.add(blurStuff);
+
+                    // Rotate / anchor / Scale around the center
+                    logo.anchor.set(0.5, 0.5);
+                    logo.scale.set(0.5, 0.5);
+                    screenFadeContainer.addChild(logo);
+
+                    // Main Menu Logic
+                    setTimeout(function () {
+                        if(gameOverMusic.currentTime > 0){
+                            stopMusic(gameOverMusic);
+                            introMusic.play();
+
+                        }
+                        app.ticker.remove(blurStuff);
+                        app.stage.removeChild(screenFadeContainer);
+                        mainMenuContainer.scale.x = mainMenuContainer.scale.y = 1;
+                        app.stage.addChild(mainMenuContainer);
+                        var mainMenuCover = introBackDrop;
+                        mainMenuContainer.addChild(mainMenuCover);
+
+                        logo = new PIXI.Sprite(logo.texture);
+                        logo.x = app.renderer.width / 2;
+                        logo.y = app.renderer.height / 10 + 50;
+                        logo.anchor.set(0.5, 0.5);
+                        logo.scale.set(0.5, 0.5);
+
+
+                        exitButton = new PIXI.Sprite(exitbutton.texture);
+                        buttonPlay = new PIXI.Sprite(playbutton.texture);
+                        introBackDrop = new PIXI.Sprite(introBackDrop.texture);
+
+                        introBackDrop.x = app.renderer.width / 2;
+                        introBackDrop.y = app.renderer.height / 2;
+
+
+                        // Setup the position of the elements
+                        buttonPlay.x = app.renderer.width / 2;
+                        buttonPlay.y = 250;
+                        buttonPlay.anchor.set(0.5, 0.5);
+                        buttonPlay.scale.set(0.5, 0.5);
+
+                        exitButton.x = app.renderer.width / 2;
+                        exitButton.y = 350;
+                        exitButton.anchor.set(0.5, 0.5);
+                        exitButton.scale.set(0.5, 0.5);
+
+                        mainMenuContainer.addChild(logo);
+                        mainMenuContainer.addChild(buttonPlay);
+                        mainMenuContainer.addChild(exitButton);
+                        buttonPlay.interactive = true;
+                        exitButton.interactive = true;
+
+
+                        // Setup the position of the elements
+
+                        createEnemyShip(introspaceships, mainMenuContainer, turnspeed);
+                        createStars(mainMenuContainer);
+                        app.ticker.add(update);
+
+
+                        //Button Logic
+                        //switch containers
+                        buttonPlay.on("click", function (e) {
+                            buttonclick.play();
+                            app.stage.removeChild(mainMenuContainer);
+                            startGame();
+                        });
+
+                        //switch containers
+                        exitButton.on("click", function (e) {
+                            buttonclick.play();
+                            introMusic.stop();
+                            app.stage.removeChild(mainMenuContainer);
+
+                            //TODO: create this container for exit
+                            app.stage.addChild(exitContainer);
+                            app.ticker.remove(update);
+                        });
+                    }, 2000);
+
+
+                    //Start Game after play btn
+                    function startGame() {
+
+                        //Game Contains
+                        app.stage.removeChild(mainMenuContainer);
+                        app.stage.addChild(gameContainer);
+                        gameContainer.scale.x = gameContainer.scale.y = 1;
+                        var fullSceenGame = rectangle(0, 0, app.renderer.width, app.renderer.height, 0xFFFFFF, 0xFFFFFF, 0);
+                        gameContainer.addChild(fullSceenGame);
+
+                        // Setup the position of the elements
+                        spaceship.x = app.renderer.width / 10;
+                        spaceship.y = app.renderer.height / 2;
+                        spaceship.vx = 5;
+
+                        // Rotate / anchor / Scale around the center
+                        spaceship.anchor.set(0.5, 0.5);
+                        spaceship.scale.set(0.2, 0.2);
+
+                        //Parallex scrollng layers
+                        mid.x = 0;
+                        mid.y = 0;
+                        mid.tilePosition.x = 0;
+                        mid.tilePosition.y = 0;
+                        far.tilePosition.x = 0;
+                        far.tilePosition.y = 0;
+                        far.position.x = 0;
+                        far.position.y = 0;
+
+
+                        //Adding game elements to stage
+                        gameContainer.addChild(far);
+                        gameContainer.addChild(mid);
+                        gameContainer.addChild(spaceship);
+
+
+
+                        //function to load in game enemeyspace ships randomly moving every 2 sec
+                        setInterval(function () {
+                            createEnemyShip(enemyspaceship, gameContainer);
+                            console.log("created enemy ship");
+                        }, 2000);
+
+
+                    }
+                }
+
+                //Draw Container Screen Setup
+                function rectangle(x, y, width, height, backgroundColor, borderColor, borderWidth) {
+                    var box = new PIXI.Graphics();
+                    box.beginFill(backgroundColor);
+                    box.lineStyle(borderWidth, borderColor);
+                    box.drawRect(0, 0, width - borderWidth, height - borderWidth);
+                    box.endFill();
+                    box.position.x = x + borderWidth / 2;
+                    box.position.y = y + borderWidth / 2;
+                    return box;
+                }
+
+
+                function createEnemyShip(element, container, turnspeed) {
+                    var elm = new PIXI.Sprite(element);
+                    elm.position.x = Math.random() * app.renderer.width;
+                    elm.position.y = Math.random() * app.renderer.height;
+                    elm.anchor.set(0.5, 0.5);
+                    elm.scale.set(0.2, 0.2);
+                    elm.vx = 300;
+                    elm.dir = (Math.random() > 0.5) ? 1 : -1;
+                    elm.turnSpeed = turnspeed;
+                    container.addChild(elm);
+                    elements.push(elm);
+                    //Rotate its parts when exploded
+
+
+                }
+
+                function createStars(container) {
+                    //TODO: maybe move to update() later
+                    var count = 0;
+                    var stars = [];
+
+                    var renderer = app.renderer;
+                    //Create some stars
+                    var graphics = new PIXI.Graphics();
+                    graphics.beginFill(0xFFFFFF);
+                    graphics.drawCircle(2, 2, 2);
+                    graphics.endFill();
+                    var texture = renderer.generateTexture(graphics);
+                    var glowFilter = new PIXI.filters.GlowFilter(app.renderer.width, app.renderer.height, 55, 1, 2, 0xFF0000, 0.001);
+                    graphics.filters = [glowFilter];
+
+                    for (var i = 0; i < 10; i++) {
+                        var s = new PIXI.Sprite(texture);
+                        s.vx = 100;
+                        s.rotation = 10;
+                        s.position.x = Math.random() * app.renderer.width;
+                        s.position.y = Math.random() * app.renderer.height;
+                        stars.push(s);
+                        container.addChild(s);
+                    }
+
+                    app.ticker.add(function () {
+                        for (var s = stars.length - 1; s >= 0; s--) {
+                            count += 0.005;
+                            glowFilter.glow = 20 * (count);
+                            stars[s].position.x += Math.random() * 10.0 - 5.0;
+                            stars[s].position.y += Math.random() * 10.0 - 5.0;
+                        }
+                    });
+                }
+
+                //TODO BEAM && SHIP PARTS CREATION
+                function explode(direction, startPosition, particle) {
+                    var particle = new PIXI.Sprite(particle);
+                    particle.position.x = startPosition.x;
+                    particle.position.y = startPosition.y;
+                    particle.scale.x = particle.scale.y = 0.2;
+                    particle.rotation = direction;
+                    app.stage.addChild(particle);
+                    parts.push(particle);
+                }
+
+
+
+                function intersects(attackers, target) {
+                    for (var i = 0; i < attackers.length; i++) {
+                        var attacker = attackers[i];
+                        var w = (attacker.width + target.width) / 2;
+                        var h = (attacker.height + target.height) / 2;
+                        if (attacker.position.x - w < target.position.x &&
+                                attacker.position.x + w > target.position.x &&
+                                attacker.position.y - h < target.position.y &&
+                                attacker.position.y + h > target.position.y) {
+                            return true;
+                        }
+                    }
+                }
+
+                function stopMusic(music) {
+                    music.pause();
+                    music.currentTime = 0;
+                }
+
+
+                function gameOver() {
+                    stopMusic(introMusic);
+                    gameOverMusic.play();
+                    app.stage.removeChild(gameContainer);
+                    gameOverContainer.scale.x = gameOverContainer.scale.y = 1;
+                    app.stage.addChild(gameOverContainer);
+                    var endCover = endBackDrop;
+                    gameOverContainer.addChild(endCover);
+                    setTimeout(function()
+                    {
+                        app.stage.addChild(mainMenuContainer);
+                        app.stage.removeChild(gameOverContainer);
+                    }, 3000);
+
+                }
+
+                window.addEventListener("keydown", function (e) {
+                    // to make it work on old versions of IE (pre IE9) where the event was not passed into the handler function.
+                    if (typeof(e) === "undefined") {
+                        e = window.event;
+                    }
+                    e.preventDefault();
+                    //Sense the key pressed directions and move the spaceship accordingly
+                    if (e.keyCode == 37) { //if left do the below:
+                        spaceship.x += spaceship.vx;
+                    } else if (e.keyCode == 39) { //if right do the below:
+                        spaceship.x -= spaceship.vx;
+                    } else if (e.keyCode == 40) { //if down do the below:
+                        spaceship.y -= spaceship.vx;
+                    } else if (e.keyCode == 38) {
+                        //if up do the below:
+                        spaceship.y += spaceship.vx;
+                    }
+                    else if (e.keyCode == 32) {
+                        //alert('shoot');
+                        firelaser.play();
+                        explode(0, spaceship, beam);
+
+                    } else if (e.keyCode == 13) {
+                        console.log('trying ot explode');
+
+                    } else {
+                        console.log("please press a valid direction");
+                    }
+                });
+            });
+</script>
+</body>
+</html>
